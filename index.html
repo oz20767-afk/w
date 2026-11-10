@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EngEng 스마트 영단어장 & Gemini AI</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 폭죽 애니메이션 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- 구글 웹폰트 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Outfit', 'Noto Sans KR', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ================= 헤더 ================= -->
+  <header class="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <span class="text-3xl">✨</span>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold tracking-tight">EngEng 스마트 영단어장</h1>
+            <span class="text-[10px] font-semibold bg-indigo-500/50 text-indigo-100 border border-indigo-300/30 px-2 py-0.5 rounded-full">Gemini AI</span>
+          </div>
+          <p class="text-xs text-indigo-100">AI 자동 사전 조회 &bull; 미국식 발음(TTS) &bull; 10문항 스펠링 퀴즈</p>
+        </div>
+      </div>
+
+      <!-- 상단 컨트롤 버튼 (API 설정 & 탭 내비) -->
+      <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <button onclick="openApiKeyModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/20 transition backdrop-blur-sm" title="Gemini API Key 설정">
+          🔑 <span id="apiKeyBtnText">API 키 설정</span>
+        </button>
+        <nav class="flex bg-white/15 p-1 rounded-xl backdrop-blur-sm">
+          <button id="navTabWords" onclick="switchTab('words')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-indigo-700 shadow-sm">
+            📚 단어장
+          </button>
+          <button id="navTabQuiz" onclick="switchTab('quiz')" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-white hover:text-indigo-100">
+            🎮 퀴즈
+          </button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= 메인 본문 ================= -->
+  <main class="max-w-4xl w-full mx-auto p-4 sm:p-6 flex-1 space-y-6">
+
+    <!-- [1단계] 단어 추가 및 학습 모드 -->
+    <section id="wordsView" class="space-y-6">
+      
+      <!-- 새 단어 등록 카드 (Gemini AI 연동) -->
+      <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-100">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <span class="text-indigo-600 font-extrabold text-lg">＋</span> 새 단어 등록
+          </h2>
+          <span class="text-xs text-slate-400">단어 입력 후 AI 자동 조회를 누르면 즉시 채워집니다</span>
+        </div>
+
+        <form id="addWordForm" onsubmit="handleAddWord(event)" class="space-y-4">
+          <!-- 단어 입력 & AI 조회 버튼 -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">영어 단어 <span class="text-rose-500">*</span></label>
+            <div class="flex gap-2">
+              <input type="text" id="inputWord" required placeholder="예: appreciate" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
+              <button type="button" id="btnAiLookup" onclick="handleAiLookup()" class="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm transition-all active:scale-95 whitespace-nowrap">
+                <span id="aiLookupIcon">✨</span>
+                <span id="aiLookupText">AI 자동 조회</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 품사 & 한글 뜻 -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">품사</label>
+              <input type="text" id="inputPos" placeholder="예: 동사, 명사, 형용사" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold text-slate-600 mb-1">한글 뜻 <span class="text-rose-500">*</span></label>
+              <input type="text" id="inputMeaning" required placeholder="예: 고마워하다, 인정하다" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            </div>
+          </div>
+
+          <!-- 예문 & 예문 한글 해석 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">영어 예문</label>
+              <input type="text" id="inputExample" placeholder="예: I really appreciate your timely help." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">예문 한글 해석</label>
+              <input type="text" id="inputExampleTrans" placeholder="예: 적절한 시기의 도움에 진심으로 감사드립니다." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            </div>
+          </div>
+
+          <!-- 등록 버튼 -->
+          <div class="flex justify-end pt-1">
+            <button type="submit" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5">
+              <span>단어장에 저장하기</span>
+              <span>💾</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 단어 목록 컨트롤 헤더 -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div class="flex items-center gap-2">
+          <h3 class="text-base font-bold text-slate-800">단어장 목록</h3>
+          <span id="wordCountBadge" class="bg-indigo-100 text-indigo-700 text-xs px-2.5 py-0.5 rounded-full font-bold">0개</span>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <input type="text" id="searchInput" oninput="renderWordList()" placeholder="단어, 뜻, 품사 검색..." class="w-full sm:w-60 px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <button onclick="resetDefaultWords()" title="기본 단어 10개 복원" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition whitespace-nowrap">
+            기본값 복원
+          </button>
+        </div>
+      </div>
+
+      <!-- 단어 카드 그리드 -->
+      <div id="wordListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <!-- JS 렌더링 -->
+      </div>
+    </section>
+
+    <!-- [2단계] 스펠링 퀴즈 모드 -->
+    <section id="quizView" class="hidden">
+      <!-- 퀴즈 대기 화면 -->
+      <div id="quizStartCard" class="bg-white rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto shadow-sm border border-slate-100 space-y-6">
+        <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center text-4xl mx-auto shadow-inner">
+          🎯
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-slate-800">10문항 스펠링 퀴즈</h2>
+          <p class="text-sm text-slate-500 mt-2">
+            저장된 단어 중 <strong class="text-indigo-600">최대 10개</strong>가 무작위로 출제됩니다.<br>
+            품사와 뜻, 예문 힌트를 보고 정확한 스펠링을 입력해보세요!
+          </p>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-2xl text-xs text-slate-600 flex justify-around">
+          <div><span class="block text-base font-bold text-indigo-600" id="quizReadyCount">0개</span>단어 수</div>
+          <div><span class="block text-base font-bold text-indigo-600">최대 10개</span>출제 문항</div>
+          <div><span class="block text-base font-bold text-indigo-600">TTS 음성</span>발음 힌트</div>
+        </div>
+        <button onclick="startQuiz()" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 hover:opacity-95 active:scale-95 transition-all text-base">
+          퀴즈 시작하기 🚀
+        </button>
+      </div>
+
+      <!-- 퀴즈 진행 화면 -->
+      <div id="quizPlayCard" class="hidden bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-slate-100 max-w-xl mx-auto space-y-6">
+        <div class="space-y-2">
+          <div class="flex justify-between text-xs font-semibold text-slate-500">
+            <span id="quizQuestionNumber">문제 1 / 10</span>
+            <span id="quizScoreTracker">현재 점수: 0점</span>
+          </div>
+          <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+            <div id="quizProgressBar" class="bg-indigo-600 h-full transition-all duration-300" style="width: 10%;"></div>
+          </div>
+        </div>
+
+        <!-- 문제 카드 -->
+        <div class="bg-slate-50 rounded-2xl p-6 text-center space-y-3 border border-slate-100">
+          <div class="flex items-center justify-center gap-1.5">
+            <span id="quizQuestionPos" class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100 hidden">품사</span>
+            <span class="text-[11px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full">한국어 뜻</span>
+          </div>
+          <h3 id="quizQuestionMeaning" class="text-2xl font-extrabold text-slate-800">뜻 로딩 중...</h3>
+          
+          <div id="quizExampleWrapper" class="space-y-1">
+            <p id="quizQuestionExample" class="text-xs sm:text-sm text-slate-600 italic">"Example with ______"</p>
+            <p id="quizQuestionExampleTrans" class="text-[11px] text-slate-400">예문 해석</p>
+          </div>
+
+          <button type="button" onclick="speakCurrentQuizWord()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-400 rounded-full text-xs font-semibold text-slate-600 shadow-sm transition">
+            🔊 발음 힌트 듣기
+          </button>
+        </div>
+
+        <!-- 답안 입력 -->
+        <form id="quizAnswerForm" onsubmit="handleQuizSubmit(event)" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">스펠링 입력 (대소문자 무관)</label>
+            <input type="text" id="quizInputAnswer" autocomplete="off" autofocus placeholder="단어의 철자를 입력하세요" class="w-full px-4 py-3 text-center text-lg font-bold tracking-wider rounded-2xl border-2 border-slate-200 focus:border-indigo-600 focus:outline-none transition">
+          </div>
+          <button type="submit" id="quizSubmitBtn" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all">
+            정답 제출 (Enter)
+          </button>
+        </form>
+
+        <div id="quizFeedbackBox" class="hidden p-4 rounded-2xl text-center text-sm font-semibold transition-all"></div>
+      </div>
+
+      <!-- 퀴즈 결과 화면 -->
+      <div id="quizResultCard" class="hidden bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-slate-100 max-w-xl mx-auto text-center space-y-6">
+        <div class="text-5xl" id="resultEmoji">🎉</div>
+        <div>
+          <h2 class="text-2xl font-bold text-slate-800">퀴즈 완료!</h2>
+          <p class="text-slate-500 text-sm mt-1" id="resultSubtitle">수고하셨습니다!</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-5 rounded-2xl">
+          <div>
+            <span class="text-xs text-slate-500 font-semibold">최종 점수</span>
+            <p class="text-3xl font-extrabold text-indigo-600 mt-1" id="resultScore">0 / 10</p>
+          </div>
+          <div>
+            <span class="text-xs text-slate-500 font-semibold">정답률</span>
+            <p class="text-3xl font-extrabold text-indigo-600 mt-1" id="resultAccuracy">0%</p>
+          </div>
+        </div>
+
+        <!-- 오답 복습 리스트 -->
+        <div id="wrongWordsContainer" class="text-left space-y-2 hidden">
+          <h4 class="text-xs font-bold text-rose-500 flex items-center gap-1">
+            <span>📝</span> 다시 복습할 오답 단어
+          </h4>
+          <div id="wrongWordsList" class="bg-rose-50/60 rounded-2xl p-4 border border-rose-100 space-y-2.5 text-xs">
+            <!-- JS 렌더링 -->
+          </div>
+        </div>
+
+        <div class="flex gap-2.5 pt-1">
+          <button onclick="startQuiz()" class="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all text-sm">
+            다시 도전하기 🔄
+          </button>
+          <button onclick="switchTab('words')" class="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-2xl transition text-sm">
+            단어장으로 가기 📚
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= API 키 설정 모달 ================= -->
+  <div id="apiKeyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <span>🔑</span> Google Gemini API 키 설정
+        </h3>
+        <button onclick="closeApiKeyModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+      </div>
+      <p class="text-xs text-slate-500 leading-relaxed">
+        <strong>Gemini 3 Flash Preview</strong> 모델을 호출하여 단어의 품사, 뜻, 예문, 해석을 실시간 자동 조회합니다.<br>
+        입력하신 API 키는 외부 서버로 전송되지 않고 브라우저(localStorage)에만 안전하게 보관됩니다.
+      </p>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Gemini API Key</label>
+        <input type="password" id="inputApiKey" placeholder="AIzaSy..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono">
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="inline-block text-[11px] text-indigo-600 hover:underline mt-1.5 font-medium">
+          👉 Google AI Studio에서 무료 API 키 발급받기
+        </a>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" onclick="closeApiKeyModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition">
+          닫기
+        </button>
+        <button type="button" onclick="saveApiKey()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition shadow-md">
+          저장하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 푸터 -->
+  <footer class="bg-white border-t border-slate-100 py-3 text-center text-xs text-slate-400">
+    EngEng Wordbook &bull; Powered by Google Gemini 3 Flash &amp; Web Speech API
+  </footer>
+
+  <!-- ================= JavaScript 전체 로직 ================= -->
+  <script>
+    // 기본 추천 단어 10개 (품사 & 예문 해석 포함)
+    const DEFAULT_WORDS = [
+      { id: '1', word: 'appreciate', partOfSpeech: '동사', meaning: '고마워하다, 인정하다', example: 'I really appreciate your timely help.', exampleTranslation: '적절한 시기에 도와주셔서 진심으로 감사드립니다.' },
+      { id: '2', word: 'collaborate', partOfSpeech: '동사', meaning: '협력하다, 공동 작업하다', example: 'We need to collaborate with other teams.', exampleTranslation: '우리는 다른 팀들과 긴밀히 협력해야 합니다.' },
+      { id: '3', word: 'diligent', partOfSpeech: '형용사', meaning: '근면한, 성실한', example: 'He is a diligent student who never gives up.', exampleTranslation: '그는 절대 포기하지 않는 성실한 학생입니다.' },
+      { id: '4', word: 'essential', partOfSpeech: '형용사', meaning: '필수적인, 극히 중요한', example: 'Water is essential for all living creatures.', exampleTranslation: '물은 모든 생명체에게 필수적입니다.' },
+      { id: '5', word: 'fascinating', partOfSpeech: '형용사', meaning: '매혹적인, 매우 흥미로운', example: 'The science exhibition was truly fascinating.', exampleTranslation: '그 과학 전시는 참으로 흥미진진했습니다.' },
+      { id: '6', word: 'generous', partOfSpeech: '형용사', meaning: '관대한, 후한', example: 'She made a generous donation to the shelter.', exampleTranslation: '그녀는 보호소에 후한 기부금을 냈습니다.' },
+      { id: '7', word: 'hesitate', partOfSpeech: '동사', meaning: '망설이다, 주저하다', example: 'Do not hesitate to ask any questions.', exampleTranslation: '어떤 질문이든 망설이지 말고 질문하세요.' },
+      { id: '8', word: 'innovative', partOfSpeech: '형용사', meaning: '혁신적인', example: 'They launched an innovative mobile service.', exampleTranslation: '그들은 혁신적인 모바일 서비스를 출시했습니다.' },
+      { id: '9', word: 'perseverance', partOfSpeech: '명사', meaning: '인내(심), 끈기', example: 'Success requires patience and perseverance.', exampleTranslation: '성공은 인내와 끈기를 필요로 합니다.' },
+      { id: '10', word: 'resilient', partOfSpeech: '형용사', meaning: '회복력 있는, 탄력 있는', example: 'Children are often remarkably resilient.', exampleTranslation: '어린이들은 종종 놀라울 정도로 회복력이 뛰어납니다.' }
+    ];
+
+    const STORAGE_KEY = 'engeng_vocab_gemini_v2';
+    const API_KEY_STORAGE = 'engeng_gemini_api_key';
+
+    let words = [];
+    let geminiApiKey = '';
+
+    // 초기 실행
+    function init() {
+      geminiApiKey = localStorage.getItem(API_KEY_STORAGE) || '';
+      updateApiKeyBtnStatus();
+
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          words = JSON.parse(saved);
+        } catch (e) {
+          words = [...DEFAULT_WORDS];
+        }
+      } else {
+        words = [...DEFAULT_WORDS];
+        saveWords();
+      }
+      renderWordList();
+      updateQuizReadyCount();
+    }
+
+    function saveWords() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+      updateQuizReadyCount();
+    }
+
+    function resetDefaultWords() {
+      if (confirm('기본 단어 10개 목록으로 초기화하시겠습니까?')) {
+        words = [...DEFAULT_WORDS];
+        saveWords();
+        renderWordList();
+      }
+    }
+
+    // API Key 모달 제어
+    function openApiKeyModal() {
+      document.getElementById('inputApiKey').value = geminiApiKey;
+      document.getElementById('apiKeyModal').classList.remove('hidden');
+    }
+
+    function closeApiKeyModal() {
+      document.getElementById('apiKeyModal').classList.add('hidden');
+    }
+
+    function saveApiKey() {
+      const key = document.getElementById('inputApiKey').value.trim();
+      geminiApiKey = key;
+      localStorage.setItem(API_KEY_STORAGE, key);
+      updateApiKeyBtnStatus();
+      closeApiKeyModal();
+      if (key) {
+        alert('Gemini API 키가 성공적으로 저장되었습니다! ✨');
+      }
+    }
+
+    function updateApiKeyBtnStatus() {
+      const btnText = document.getElementById('apiKeyBtnText');
+      if (geminiApiKey) {
+        btnText.innerText = 'API 키 등록됨 ✅';
+      } else {
+        btnText.innerText = 'API 키 설정 🔑';
+      }
+    }
+
+    // ==============================================
+    // [Gemini 3 Flash Preview] AI 자동 단어 조회
+    // ==============================================
+    async function handleAiLookup() {
+      const wordInput = document.getElementById('inputWord');
+      const targetWord = wordInput.value.trim();
+
+      if (!targetWord) {
+        alert('먼저 조회할 영어 단어를 입력해주세요.');
+        wordInput.focus();
+        return;
+      }
+
+      if (!geminiApiKey) {
+        alert('Gemini API 키가 설정되지 않았습니다. API 키를 먼저 입력해주세요.');
+        openApiKeyModal();
+        return;
+      }
+
+      setAiLoading(true);
+
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`;
+
+      const requestPayload = {
+        contents: [
+          {
+            parts: [
+              {
+                text: `You are an expert English-Korean lexicographer. Analyze the English word: "${targetWord}".
+Return the most representative part of speech (in Korean, e.g. 명사, 동사, 형용사, 부사), a concise and natural Korean definition/meaning, a practical and natural English example sentence demonstrating its usage, and the natural Korean translation of the example sentence.`
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              partOfSpeech: {
+                type: "STRING",
+                description: "Part of speech in Korean (e.g. 명사, 동사, 형용사, 부사)"
+              },
+              meaning: {
+                type: "STRING",
+                description: "Natural and concise Korean definition of the word"
+              },
+              example: {
+                type: "STRING",
+                description: "Natural English example sentence featuring the word"
+              },
+              exampleTranslation: {
+                type: "STRING",
+                description: "Accurate Korean translation of the example sentence"
+              }
+            },
+            required: ["partOfSpeech", "meaning", "example", "exampleTranslation"]
+          }
+        }
+      };
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload)
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP 오류 (${response.status})`);
+        }
+
+        const data = await response.json();
+        const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!rawJsonText) {
+          throw new Error('Gemini로부터 유효한 응답을 받지 못했습니다.');
+        }
+
+        const parsed = JSON.parse(rawJsonText);
+
+        document.getElementById('inputPos').value = parsed.partOfSpeech || '';
+        document.getElementById('inputMeaning').value = parsed.meaning || '';
+        document.getElementById('inputExample').value = parsed.example || '';
+        document.getElementById('inputExampleTrans').value = parsed.exampleTranslation || '';
+
+        // 단어 발음 자동 1회 들려주기
+        speakText(targetWord);
+
+      } catch (error) {
+        console.error('Gemini API Error:', error);
+        alert(`AI 단어 조회 중 오류가 발생했습니다:\n${error.message}\n(API 키 및 네트워크 연결 상태를 확인해주세요)`);
+      } finally {
+        setAiLoading(false);
+      }
+    }
+
+    function setAiLoading(isLoading) {
+      const btn = document.getElementById('btnAiLookup');
+      const icon = document.getElementById('aiLookupIcon');
+      const text = document.getElementById('aiLookupText');
+
+      if (isLoading) {
+        btn.disabled = true;
+        btn.classList.add('opacity-70', 'cursor-not-allowed');
+        icon.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
+        text.innerText = 'AI 분석 중...';
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        icon.innerText = '✨';
+        text.innerText = 'AI 자동 조회';
+      }
+    }
+
+    // TTS 발음 듣기 (Web Speech API)
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) {
+        alert('이 브라우저는 음성 합성(SpeechSynthesis)을 지원하지 않습니다.');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // 단어 저장 처리
+    function handleAddWord(e) {
+      e.preventDefault();
+      const wordInput = document.getElementById('inputWord');
+      const posInput = document.getElementById('inputPos');
+      const meaningInput = document.getElementById('inputMeaning');
+      const exampleInput = document.getElementById('inputExample');
+      const exampleTransInput = document.getElementById('inputExampleTrans');
+
+      const word = wordInput.value.trim();
+      const meaning = meaningInput.value.trim();
+
+      if (!word || !meaning) return;
+
+      words.unshift({
+        id: Date.now().toString(),
+        word: word,
+        partOfSpeech: posInput.value.trim(),
+        meaning: meaning,
+        example: exampleInput.value.trim(),
+        exampleTranslation: exampleTransInput.value.trim()
+      });
+
+      saveWords();
+      renderWordList();
+      speakText(word);
+
+      // 폼 비우기
+      wordInput.value = '';
+      posInput.value = '';
+      meaningInput.value = '';
+      exampleInput.value = '';
+      exampleTransInput.value = '';
+      wordInput.focus();
+    }
+
+    function deleteWord(id) {
+      words = words.filter(w => w.id !== id);
+      saveWords();
+      renderWordList();
+    }
+
+    // 단어 목록 렌더링
+    function renderWordList() {
+      const container = document.getElementById('wordListContainer');
+      const search = document.getElementById('searchInput').value.trim().toLowerCase();
+      const badge = document.getElementById('wordCountBadge');
+
+      const filtered = words.filter(item => 
+        item.word.toLowerCase().includes(search) ||
+        item.meaning.toLowerCase().includes(search) ||
+        (item.partOfSpeech && item.partOfSpeech.toLowerCase().includes(search))
+      );
+
+      badge.innerText = `${filtered.length}개`;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200 text-sm">
+            등록된 단어가 없거나 검색 결과가 없습니다.
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => `
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between hover:shadow-md transition">
+          <div>
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-base font-bold text-slate-800 tracking-wide">${escapeHtml(item.word)}</span>
+                ${item.partOfSpeech ? `<span class="text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full">${escapeHtml(item.partOfSpeech)}</span>` : ''}
+                <button onclick="speakText('${escapeHtml(item.word)}')" class="p-1 text-indigo-600 hover:bg-indigo-50 rounded-lg transition" title="단어 발음 듣기">
+                  🔊
+                </button>
+              </div>
+              <button onclick="deleteWord('${item.id}')" class="text-xs text-slate-400 hover:text-rose-500 p-1" title="삭제">
+                ✕
+              </button>
+            </div>
+            <p class="text-xs font-medium text-slate-600 mt-1.5">${escapeHtml(item.meaning)}</p>
+            ${item.example ? `
+              <div class="mt-3 pt-2.5 border-t border-slate-50 space-y-1">
+                <div class="flex items-start justify-between text-xs text-slate-600">
+                  <p class="italic pr-2 leading-relaxed">"${escapeHtml(item.example)}"</p>
+                  <button onclick="speakText('${escapeHtml(item.example)}')" class="text-slate-400 hover:text-indigo-600 shrink-0" title="예문 발음 듣기">
+                    🔊
+                  </button>
+                </div>
+                ${item.exampleTranslation ? `<p class="text-[11px] text-slate-400 leading-relaxed">${escapeHtml(item.exampleTranslation)}</p>` : ''}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ==============================================
+    // [2단계] 스펠링 퀴즈 로직
+    // ==============================================
+    let quizList = [];
+    let currentQuizIndex = 0;
+    let quizScore = 0;
+    let wrongAnswers = [];
+
+    function updateQuizReadyCount() {
+      const readyCountEl = document.getElementById('quizReadyCount');
+      if (readyCountEl) readyCountEl.innerText = `${words.length}개`;
+    }
+
+    function startQuiz() {
+      if (words.length === 0) {
+        alert('단어가 최소 1개 이상 등록되어 있어야 퀴즈를 풀 수 있습니다.');
+        switchTab('words');
+        return;
+      }
+
+      quizList = [...words].sort(() => 0.5 - Math.random()).slice(0, 10);
+      currentQuizIndex = 0;
+      quizScore = 0;
+      wrongAnswers = [];
+
+      document.getElementById('quizStartCard').classList.add('hidden');
+      document.getElementById('quizResultCard').classList.add('hidden');
+      document.getElementById('quizPlayCard').classList.remove('hidden');
+
+      loadQuizQuestion();
+    }
+
+    function loadQuizQuestion() {
+      const current = quizList[currentQuizIndex];
+      const progressPercent = ((currentQuizIndex + 1) / quizList.length) * 100;
+
+      document.getElementById('quizQuestionNumber').innerText = `문제 ${currentQuizIndex + 1} / ${quizList.length}`;
+      document.getElementById('quizScoreTracker').innerText = `현재 점수: ${quizScore * 10}점`;
+      document.getElementById('quizProgressBar').style.width = `${progressPercent}%`;
+
+      const posBadge = document.getElementById('quizQuestionPos');
+      if (current.partOfSpeech) {
+        posBadge.innerText = current.partOfSpeech;
+        posBadge.classList.remove('hidden');
+      } else {
+        posBadge.classList.add('hidden');
+      }
+
+      document.getElementById('quizQuestionMeaning').innerText = current.meaning;
+
+      const exampleWrapper = document.getElementById('quizExampleWrapper');
+      const exampleEl = document.getElementById('quizQuestionExample');
+      const transEl = document.getElementById('quizQuestionExampleTrans');
+
+      if (current.example) {
+        const regex = new RegExp(current.word, 'gi');
+        exampleEl.innerText = `"${current.example.replace(regex, '________')}"`;
+        transEl.innerText = current.exampleTranslation || '';
+        exampleWrapper.classList.remove('hidden');
+      } else {
+        exampleWrapper.classList.add('hidden');
+      }
+
+      const input = document.getElementById('quizInputAnswer');
+      input.value = '';
+      input.disabled = false;
+      input.focus();
+
+      const feedback = document.getElementById('quizFeedbackBox');
+      feedback.className = 'hidden';
+      feedback.innerText = '';
+
+      const submitBtn = document.getElementById('quizSubmitBtn');
+      submitBtn.innerText = '정답 제출 (Enter)';
+      submitBtn.disabled = false;
+    }
+
+    function speakCurrentQuizWord() {
+      if (quizList[currentQuizIndex]) {
+        speakText(quizList[currentQuizIndex].word);
+      }
+    }
+
+    function handleQuizSubmit(e) {
+      e.preventDefault();
+      const current = quizList[currentQuizIndex];
+      const input = document.getElementById('quizInputAnswer');
+      const feedback = document.getElementById('quizFeedbackBox');
+      const submitBtn = document.getElementById('quizSubmitBtn');
+
+      const userAnswer = input.value.trim().toLowerCase();
+      const correctAnswer = current.word.trim().toLowerCase();
+
+      input.disabled = true;
+      submitBtn.disabled = true;
+
+      if (userAnswer === correctAnswer) {
+        quizScore++;
+        feedback.className = 'p-3.5 rounded-2xl text-center text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 block';
+        feedback.innerHTML = `🎉 정답입니다! (<strong>${current.word}</strong>)`;
+        speakText(current.word);
+      } else {
+        wrongAnswers.push({ ...current, yourAnswer: userAnswer || '(미입력)' });
+        feedback.className = 'p-3.5 rounded-2xl text-center text-sm font-bold bg-rose-50 text-rose-700 border border-rose-200 block';
+        feedback.innerHTML = `❌ 오답입니다! 정답: <strong>${current.word}</strong>`;
+        speakText(current.word);
+      }
+
+      setTimeout(() => {
+        currentQuizIndex++;
+        if (currentQuizIndex < quizList.length) {
+          loadQuizQuestion();
+        } else {
+          showQuizResult();
+        }
+      }, 1400);
+    }
+
+    function showQuizResult() {
+      document.getElementById('quizPlayCard').classList.add('hidden');
+      const resultCard = document.getElementById('quizResultCard');
+      resultCard.classList.remove('hidden');
+
+      const total = quizList.length;
+      const accuracy = Math.round((quizScore / total) * 100);
+
+      document.getElementById('resultScore').innerText = `${quizScore} / ${total}`;
+      document.getElementById('resultAccuracy').innerText = `${accuracy}%`;
+
+      const emojiEl = document.getElementById('resultEmoji');
+      const subTitleEl = document.getElementById('resultSubtitle');
+
+      if (accuracy >= 80) {
+        emojiEl.innerText = '🏆';
+        subTitleEl.innerText = '대단해요! 단어를 완벽하게 마스터하셨습니다!';
+        if (typeof confetti === 'function') {
+          confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+        }
+      } else if (accuracy >= 50) {
+        emojiEl.innerText = '👍';
+        subTitleEl.innerText = '좋은 성적입니다! 틀린 단어를 오답 노트로 확인해보세요.';
+      } else {
+        emojiEl.innerText = '💪';
+        subTitleEl.innerText = '조금 더 연습해 볼까요? 다시 한번 도전해보세요!';
+      }
+
+      const wrongContainer = document.getElementById('wrongWordsContainer');
+      const wrongList = document.getElementById('wrongWordsList');
+
+      if (wrongAnswers.length > 0) {
+        wrongContainer.classList.remove('hidden');
+        wrongList.innerHTML = wrongAnswers.map(item => `
+          <div class="flex items-center justify-between py-1.5 border-b border-rose-100 last:border-b-0">
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-slate-800 text-sm">${item.word}</span>
+                ${item.partOfSpeech ? `<span class="text-[10px] text-slate-400">(${item.partOfSpeech})</span>` : ''}
+                <span class="text-slate-600 ml-1">${item.meaning}</span>
+              </div>
+              <span class="text-rose-500 block text-[11px] mt-0.5">내 입력: ${item.yourAnswer}</span>
+            </div>
+            <button onclick="speakText('${item.word}')" class="text-indigo-600 hover:text-indigo-800 p-1 text-sm">
+              🔊
+            </button>
+          </div>
+        `).join('');
+      } else {
+        wrongContainer.classList.add('hidden');
+      }
+    }
+
+    // 탭 전환 핸들러
+    function switchTab(tab) {
+      const wordsView = document.getElementById('wordsView');
+      const quizView = document.getElementById('quizView');
+      const tabWords = document.getElementById('navTabWords');
+      const tabQuiz = document.getElementById('navTabQuiz');
+
+      if (tab === 'words') {
+        wordsView.classList.remove('hidden');
+        quizView.classList.add('hidden');
+        tabWords.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-indigo-700 shadow-sm';
+        tabQuiz.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-white hover:text-indigo-100';
+      } else {
+        wordsView.classList.add('hidden');
+        quizView.classList.remove('hidden');
+        tabQuiz.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-indigo-700 shadow-sm';
+        tabWords.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-white hover:text-indigo-100';
+
+        document.getElementById('quizStartCard').classList.remove('hidden');
+        document.getElementById('quizPlayCard').classList.add('hidden');
+        document.getElementById('quizResultCard').classList.add('hidden');
+        updateQuizReadyCount();
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    // 페이지 로드 시 구동
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
